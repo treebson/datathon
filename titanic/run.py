@@ -11,25 +11,10 @@ from sklearn.model_selection import train_test_split
 # +
 # Read dataframes
 
+print("\nReading dataframe...")
 df = pd.read_csv("train.csv")
+print(df.shape)
 df
-
-
-# +
-def extract_columns(df):
-
-    def extract_surname(name):
-        return name.split(",")[0]
-
-    def extract_title(name):
-        return name.split(",")[1].split(".")[0]
-
-    df["Surname"] = df["Name"].apply(lambda name: extract_surname(name))
-    df["Title"] = df["Name"].apply(lambda name: extract_title(name))
-    
-    return df
-
-df = extract_columns(df)
 
 # +
 # Feature engineering
@@ -38,13 +23,14 @@ pkey = "PassengerId"
 response = "Survived"
 categoricals = [
     "Pclass", # Ticket class
-    "Name", # TODO: feature engineering
+    "Name",
     "Sex",
-    "Cabin", # TODO: feature engineering
-    "Ticket",
+    #"Cabin",
+    #"Ticket",
     "Embarked",
     "Surname",
-    "Title"
+    "Title",
+    "TicketHasLetters"
 ]
 numerics = [
     "Age",
@@ -52,6 +38,15 @@ numerics = [
     "Parch", # of parents / children aboard the Titanic
     "Fare",
 ]
+
+def extract_surname(name):
+        return name.split(",")[0]
+
+def extract_title(name):
+    return name.split(",")[1].split(".")[0]
+
+def extract_ticket_has_letters(ticket):
+    return not ticket.isnumeric()
 
 def encode_categoricals(df, categoricals):
     for c in categoricals:
@@ -63,11 +58,16 @@ def inpute_median(df, numerics):
     return df
 
 def engineer_features(df):
+    df["Surname"] = df["Name"].apply(lambda name: extract_surname(name))
+    df["Title"] = df["Name"].apply(lambda name: extract_title(name))
+    df["TicketHasLetters"] = df["Ticket"].apply(lambda ticket: extract_ticket_has_letters(ticket))
     df = encode_categoricals(df, categoricals)
-    df[numerics] = df[numerics].fillna(df.median())
+    df = inpute_median(df, numerics)
     return df
 
+print("\nEngineering features...")
 df = engineer_features(df)
+print(df.shape)
 df
 
 
@@ -86,7 +86,11 @@ def extract_response(df):
     return y
 
 def train_model(X, y, seed):
-    model = RandomForestClassifier(n_estimators=1000, max_depth=5, random_state=seed)
+    model = RandomForestClassifier(
+        n_estimators=1000, 
+        max_depth=5,    
+        random_state=seed
+    )
     model.fit(X, y)
     return model
 
@@ -138,7 +142,7 @@ def print_progress_bar(iteration, total, prefix="", suffix="", length=30, fill="
 def bootstrap(df, n_bootstraps):
     print("Training with", n_bootstraps, "bootstraps...")
     start = time.time()
-    accs, aucs, importances, models = [], [], [], []
+    accs, aucs, importances = [], [], []
     for i, seed in enumerate(range(n_bootstraps)):
         df_train, df_test = split(df, seed)
         X_train = extract_features(df_train)
@@ -151,7 +155,6 @@ def bootstrap(df, n_bootstraps):
         accs.append(acc)
         aucs.append(auc)
         importances.append(importance)
-        models.append(model)
         print_progress_bar(i+1, n_bootstraps)
     acc_mean = statistics.mean(accs)
     acc_stdev = statistics.stdev(accs)
@@ -163,18 +166,19 @@ def bootstrap(df, n_bootstraps):
     print(" ")
     print(ave_importance)
     best_index = [i for i, auc in enumerate(aucs) if auc == max(aucs)][0]
-    best_model = models[best_index]
     print("\nRun time:", int(time.time() - start), "seconds")
-    return best_model
+    return best_index
         
-best_model = bootstrap(df, 10)
+best_index = bootstrap(df, 10)
 # + {}
-def score_test(best_model):
+def score_test(best_index):
     df_test = pd.read_csv("test.csv")
-    df_test = extract_columns(df_test)
     df_test = engineer_features(df_test)
     X_test = extract_features(df_test)
-    survived = best_model.predict(X_test)
+    X = extract_features(df)
+    y = extract_response(df)
+    model = train_model(X, y, best_index)
+    survived = model.predict(X_test)
     passengers = df_test["PassengerId"].values
     submission = pd.DataFrame({
         "PassengerId": passengers,
@@ -182,7 +186,7 @@ def score_test(best_model):
     })
     return submission
     
-submission = score_test(best_model)
+submission = score_test(best_index)
 submission.to_csv("submission.csv", index=False)
 submission
 # -
