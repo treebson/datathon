@@ -30,7 +30,8 @@ categoricals = [
     "Embarked",
     "Surname",
     "Title",
-    "TicketHasLetters"
+    "TicketHasLetters",
+    "CabinClass"
 ]
 numerics = [
     "Age",
@@ -40,13 +41,21 @@ numerics = [
 ]
 
 def extract_surname(name):
-        return name.split(",")[0]
+    return name.split(",")[0]
 
 def extract_title(name):
     return name.split(",")[1].split(".")[0]
 
 def extract_ticket_has_letters(ticket):
     return not ticket.isnumeric()
+
+def extract_cabin_class(cabin):
+    cabin_letters = ["A", "B", "C", "D", "E", "F"]
+    cabin_class = "N/A"
+    for c in cabin_letters:
+        if c in cabin:
+            cabin_class = c
+    return cabin_class
 
 def encode_categoricals(df, categoricals):
     for c in categoricals:
@@ -61,6 +70,8 @@ def engineer_features(df):
     df["Surname"] = df["Name"].apply(lambda name: extract_surname(name))
     df["Title"] = df["Name"].apply(lambda name: extract_title(name))
     df["TicketHasLetters"] = df["Ticket"].apply(lambda ticket: extract_ticket_has_letters(ticket))
+    df["Cabin"] = df["Cabin"].fillna("0")
+    df["CabinClass"] = df["Cabin"].apply(lambda cabin: extract_cabin_class(cabin))
     df = encode_categoricals(df, categoricals)
     df = inpute_median(df, numerics)
     return df
