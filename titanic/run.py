@@ -4,7 +4,7 @@
 import time
 import pandas as pd
 import statistics
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.metrics import accuracy_score, roc_auc_score
 from sklearn.model_selection import train_test_split
 
@@ -96,7 +96,7 @@ def extract_response(df):
     y = df[response].values
     return y
 
-def train_model(X, y, seed):
+def train_random_forest(X, y, seed):
     model = RandomForestClassifier(
         n_estimators=1000, 
         max_depth=5,    
@@ -105,6 +105,17 @@ def train_model(X, y, seed):
     model.fit(X, y)
     return model
 
+def train_gbm(X, y, seed):
+    model = GradientBoostingClassifier(
+        learning_rate=0.1, 
+        n_estimators=1000, 
+        max_depth=5,
+        subsample=0.8,
+        random_state=seed
+    )
+    model.fit(X, y)
+    return model
+    
 def evaluate_model(model, X, y_true):
     y_pred = model.predict(X)
     y_pred_proba = model.predict_proba(X)
@@ -150,8 +161,8 @@ def print_progress_bar(iteration, total, prefix="", suffix="", length=30, fill="
     if iteration == total: 
         print()
 
-def bootstrap(df, n_bootstraps):
-    print("Training with", n_bootstraps, "bootstraps...")
+def bootstrap(df, train_function, n_bootstraps):
+    print("\nTraining with", n_bootstraps, "bootstraps...")
     start = time.time()
     accs, aucs, importances = [], [], []
     for i, seed in enumerate(range(n_bootstraps)):
@@ -160,7 +171,7 @@ def bootstrap(df, n_bootstraps):
         y_train = extract_response(df_train)
         X_test = extract_features(df_test)
         y_test = extract_response(df_test)
-        model = train_model(X_train, y_train, seed)
+        model = train_function(X_train, y_train, seed)
         acc, auc = evaluate_model(model, X_test, y_test)
         importance = feature_importance(model, categoricals + numerics)
         accs.append(acc)
@@ -180,7 +191,8 @@ def bootstrap(df, n_bootstraps):
     print("\nRun time:", int(time.time() - start), "seconds")
     return best_index
         
-best_index = bootstrap(df, 10)
+bootstrap(df, train_random_forest, 10)
+best_index = bootstrap(df, train_gbm, 10)
 # + {}
 def score_test(best_index):
     df_test = pd.read_csv("test.csv")
@@ -188,7 +200,7 @@ def score_test(best_index):
     X_test = extract_features(df_test)
     X = extract_features(df)
     y = extract_response(df)
-    model = train_model(X, y, best_index)
+    model = train_gbm(X, y, best_index)
     survived = model.predict(X_test)
     passengers = df_test["PassengerId"].values
     submission = pd.DataFrame({
