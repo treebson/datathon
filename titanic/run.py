@@ -13,6 +13,23 @@ from sklearn.model_selection import train_test_split
 df = pd.read_csv("train.csv")
 df
 
+
+# +
+def extract_columns(df):
+
+    def extract_surname(name):
+        return name.split(",")[0]
+
+    def extract_title(name):
+        return name.split(",")[1].split(".")[0]
+
+    df["Surname"] = df["Name"].apply(lambda name: extract_surname(name))
+    df["Title"] = df["Name"].apply(lambda name: extract_title(name))
+    
+    return df
+
+df = extract_columns(df)
+
 # +
 # Feature engineering
 
@@ -24,7 +41,9 @@ categoricals = [
     "Sex",
     "Cabin", # TODO: feature engineering
     "Ticket",
-    "Embarked"
+    "Embarked",
+    "Surname",
+    "Title"
 ]
 numerics = [
     "Age",
@@ -149,6 +168,7 @@ best_model = bootstrap(df, 100)
 # + {}
 def score_test(best_model):
     df_test = pd.read_csv("test.csv")
+    df_test = extract_columns(df_test)
     df_test = engineer_features(df_test)
     X_test = extract_features(df_test)
     survived = best_model.predict(X_test)
