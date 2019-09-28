@@ -1,6 +1,7 @@
 # +
 # Imports
 
+import time
 import pandas as pd
 import statistics
 from sklearn.ensemble import RandomForestClassifier
@@ -85,7 +86,7 @@ def extract_response(df):
     return y
 
 def train_model(X, y, seed):
-    model = RandomForestClassifier(n_estimators=100, max_depth=2, random_state=seed)
+    model = RandomForestClassifier(n_estimators=1000, max_depth=5, random_state=seed)
     model.fit(X, y)
     return model
 
@@ -136,6 +137,7 @@ def print_progress_bar(iteration, total, prefix="", suffix="", length=30, fill="
 
 def bootstrap(df, n_bootstraps):
     print("Training with", n_bootstraps, "bootstraps...")
+    start = time.time()
     accs, aucs, importances, models = [], [], [], []
     for i, seed in enumerate(range(n_bootstraps)):
         df_train, df_test = split(df, seed)
@@ -162,9 +164,10 @@ def bootstrap(df, n_bootstraps):
     print(ave_importance)
     best_index = [i for i, auc in enumerate(aucs) if auc == max(aucs)][0]
     best_model = models[best_index]
+    print("\nRun time:", int(time.time() - start), "seconds")
     return best_model
         
-best_model = bootstrap(df, 100)
+best_model = bootstrap(df, 10)
 # + {}
 def score_test(best_model):
     df_test = pd.read_csv("test.csv")
@@ -183,6 +186,4 @@ submission = score_test(best_model)
 submission.to_csv("submission.csv", index=False)
 submission
 # -
-
-
 
