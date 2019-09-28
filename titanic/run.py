@@ -162,7 +162,7 @@ def print_progress_bar(iteration, total, prefix="", suffix="", length=30, fill="
         print()
 
 def bootstrap(df, train_function, n_bootstraps):
-    print("\nTraining with", n_bootstraps, "bootstraps...")
+    print("\nBootstrapping", train_function.__name__, n_bootstraps, "times...")
     start = time.time()
     accs, aucs, importances = [], [], []
     for i, seed in enumerate(range(n_bootstraps)):
@@ -191,8 +191,8 @@ def bootstrap(df, train_function, n_bootstraps):
     print("\nRun time:", int(time.time() - start), "seconds")
     return best_index
         
-bootstrap(df, train_random_forest, 10)
-best_index = bootstrap(df, train_gbm, 10)
+bootstrap(df, train_random_forest, 500)
+best_index = bootstrap(df, train_gbm, 500)
 # + {}
 def score_test(best_index):
     df_test = pd.read_csv("test.csv")
