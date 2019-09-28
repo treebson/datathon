@@ -11,9 +11,10 @@ from sklearn.model_selection import train_test_split
 # Read dataframes
 
 df = pd.read_csv("train.csv")
-test = pd.read_csv("test.csv")
-gender = pd.read_csv("gender_submission.csv")
-# -
+df
+
+# +
+# Feature engineering
 
 pkey = "PassengerId"
 response = "Survived"
@@ -32,10 +33,6 @@ numerics = [
     "Fare",
 ]
 
-
-# +
-# Feature engineering
-
 def encode_categoricals(df, categoricals):
     for c in categoricals:
         df[c] = df[c].astype("category").cat.codes
@@ -45,21 +42,28 @@ def inpute_median(df, numerics):
     df[numerics] = df[numerics].fillna(df.median())
     return df
 
-df = encode_categoricals(df, categoricals)
-df[numerics] = df[numerics].fillna(df.median())
+def engineer_features(df):
+    df = encode_categoricals(df, categoricals)
+    df[numerics] = df[numerics].fillna(df.median())
+    return df
 
+df = engineer_features(df)
 df
 
 
 # +
 def split(df, seed, split_ratio=0.2):
-    features = categoricals + numerics
     df_train, df_test = train_test_split(df, test_size=split_ratio, random_state=seed)
-    X_train = df_train[features].values
-    y_train = df_train[response].values
-    X_test = df_test[features].values
-    y_test = df_test[response].values
-    return X_train, y_train, X_test, y_test
+    return df_train, df_test
+
+def extract_features(df):
+    features = categoricals + numerics
+    X = df[features].values
+    return X
+
+def extract_response(df):
+    y = df[response].values
+    return y
 
 def train_model(X, y, seed):
     model = RandomForestClassifier(n_estimators=100, max_depth=2, random_state=seed)
@@ -113,15 +117,20 @@ def print_progress_bar(iteration, total, prefix="", suffix="", length=30, fill="
 
 def bootstrap(df, n_bootstraps):
     print("Training with", n_bootstraps, "bootstraps...")
-    accs, aucs, importances = [], [], []
+    accs, aucs, importances, models = [], [], [], []
     for i, seed in enumerate(range(n_bootstraps)):
-        X_train, y_train, X_test, y_test = split(df, seed)
+        df_train, df_test = split(df, seed)
+        X_train = extract_features(df_train)
+        y_train = extract_response(df_train)
+        X_test = extract_features(df_test)
+        y_test = extract_response(df_test)
         model = train_model(X_train, y_train, seed)
         acc, auc = evaluate_model(model, X_test, y_test)
         importance = feature_importance(model, categoricals + numerics)
         accs.append(acc)
         aucs.append(auc)
         importances.append(importance)
+        models.append(model)
         print_progress_bar(i+1, n_bootstraps)
     acc_mean = statistics.mean(accs)
     acc_stdev = statistics.stdev(accs)
@@ -132,8 +141,28 @@ def bootstrap(df, n_bootstraps):
     ave_importance = calculate_average_feature_importance(importances, n_bootstraps)
     print(" ")
     print(ave_importance)
+    best_index = [i for i, auc in enumerate(aucs) if auc == max(aucs)][0]
+    best_model = models[best_index]
+    return best_model
         
-bootstrap(df, 100)
+best_model = bootstrap(df, 100)
+# + {}
+def score_test(best_model):
+    df_test = pd.read_csv("test.csv")
+    df_test = engineer_features(df_test)
+    X_test = extract_features(df_test)
+    survived = best_model.predict(X_test)
+    passengers = df_test["PassengerId"].values
+    submission = pd.DataFrame({
+        "PassengerId": passengers,
+        "Survived": survived
+    })
+    return submission
+    
+submission = score_test(best_model)
+submission.to_csv("submission.csv", index=False)
+submission
 # -
+
 
 
